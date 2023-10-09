@@ -1,0 +1,113 @@
+
+# COM3505 Lab Assessment 2
+
+## Video Demonstration
+short video demonstrating the functionalities of the website:
+https://youtu.be/aNLOAt2RVKk (please turn on the youtube subtitle to have a clearer understanding)
+
+## Rationale
+Third year students are notoriously terrible sleepers due to the deluge of work (see Ziyuan's sleep on the 17th of May below). Paradoxically, being well-rested is paramount to productivity. This project aims to gather information on our sleeping schedules and present them in neat visualisations and other methods, in the hopes that the knowledge of our terrible sleep schedules can shock us into actually fixing it.
+
+![a visualisation of ziyuan's sleeping schedule](graph.png)
+
+## Setting Up
+
+### Prerequisites
+Some setup is needed in order to adapt the scripts and website to the local environment so that it will work properly. 
+To start things off, you will need to have an ESP32 Feather and a TSL2591 light sensor. Keep in mind that the TSL2591 does not come pre-soldered.
+You will also need wifi for the ESP32 to function, as well as an [Adafruit IO](https://io.adafruit.com/) account. 
+After signing up for an Adafruit IO account, note down your Adafruit IO Key by clicking on the key icon in the dashboard as indicated below. This will be useful later.
+
+![where the key icon is](dashboard.png)
+### Wiring
+Wire the Vin pin to the ESP32's 3V, the GND pin to the ESP32's GND, the SCL pin to the ESP32's SCL, and the SDA pin to the ESP32's SDA.
+The following schematic shows how we wired it ourselves:
+
+![our schematic as described above](schematic.png)
+
+
+### Initialising the ESP32
+*NOTE: This was tested on the Arduino IDE v 1.8.19. Use other IDEs on your own peril!*
+
+Let's begin with downloading the dependencies that the sensor script uses. Open up the Manage Libraries menu (Tools > Manage Libraries..., or CTRL+SHIFT+I). Search and download both **Adafruit MQTT Library** and **ArduinoHTTPClient**. Once done, install the [Adafruit IO Arduino library from GitHub](https://github.com/adafruit/Adafruit_IO_Arduino). After downloading the library, we will need to import the library (Sketch > Include Library > Add .ZIP Library...) by navigating to the installation directory and double-clicking on the library's .ZIP file.
+
+With the libraries installed, we can move on to configuring the script. Open up config.h in <code>LA2\ProjectThing</code> with an IDE/text editor. Replace IO_USERNAME and IO_KEY's values in the quotation marks with your Adafruit IO username and API key respectively. Similarly, replace WIFI_SSID and WIFI_PASS with your own wifi credentials.
+
+ProjectThing.ino will be ready to be burned into the ESP32 with everything above done.
+
+### Initialising the Website
+Much like the ESP32, the website will also need the Adafruit IO API key in order to function. Open up realtime.js and adafruit.js in <code>LA2\ProjectThing\website</code>, and change the username and apiKey fields to your Adafruit IO username and API key respectively.
+
+The website will then be fully functional with that done. Open up index.html in the same directory and visualise your sleeping schedule to your heart's content!
+
+## Using the Website
+There are mainly two functionalities provided on the website. The statistics and real-time monitoring. 
+
+The statistics tab provides a chart of the sleeping schedule based on the date the user selects. The chart can be configured to show daily or weekly charts. The user can select up to three types of charts based on their preferences: line chart, bar chart, and scatter chart. The statistics tab also breaks down how the user slept over the day/week.
+
+Here is an example of a weekly bar chart:
+![a weekly bar chart derived from the week of 13 may 2023](barchart.png)
+
+and here is how the user slept over that week:
+![an analysis of the user's sleep from the week of 13 may 2023](sleepanalysis.png)
+
+The real-time monitoring tab allows the user to monitor the real-time light sensor readings from the IoT device. The user can monitor the infrared light readings, illuminance value, and visible light readings. Based on these data, the user can adjust their sleeping environment to the ideal sleeping condition. 
+
+Here is the real-time monitoring tab:
+![real-time monitoring](real-time.png)
+
+## Design and Architecture
+On the ESP32's side, the script that it runs is based on Adafruit's very own [TSL2591 library](https://github.com/adafruit/Adafruit_TSL2591_Library) for Arduinos. The library's script has been modified to upload sensor data onto Adafruit IO every 5 seconds. 
+
+According to [Adafruit's datasheet](https://learn.adafruit.com/adafruit-tsl2591?view=all#pinouts), the TSL2591 can sense infrared, full-spectrum, and visible light. 
+
+The script was designed to deem someone as sleeping whenever the sensor reads less than 20 units of visible light. The threshold value was set to 20 as we keep all but a really dim light on whenever we go out, which is interpreted by the sensor as around 30 units of visible light. All lights will be turned off whenever we sleep.
+
+The IR sensing capabilities were originally planned to be integrated into the script in order to check if someone was in front of the sensor (or rather, in their bed), but the IR sensor couldn't really pick up on that reliably enough. 
+
+The following diagram shows the high-level architecture of the system in order to show how information flows within the system.
+
+![the aforementioned architecture diagram](architecture.png)
+
+As illustrated, the ESP32 sends its readings from the TSL2591 to Adafruit IO, and the website then pulls the data from Adafruit IO through their HTTP API. The data is then processed in the website's back end using Javascript so that it can be visualised. 
+
+Comments about more specific functions can be found in the code.
+## Tests
+
+### ESP32 Tests
+Tests performed on the ESP32 are used to measure how reliably the ESP32 can do its job.
+
+| Cases | Steps | Expected | Actual | Result
+| --- | --- | --- | --- | --- |
+| The ESP32 should properly function after a long period of time of being powered on, assuming good Internet connectivity | 1. The ESP32 will be left on for a week straight <br> 2. Adafruit IO will be checked over that period to see how many data points the ESP32 has uploaded. Assuming a perfect upload rate of 1 data point per 10 seconds, we will expect to see 60480 data points over that period. | It isn't realistic to expect that it can upload 100% of its data due to latency and other factors. A 90% upload rate would be good enough. | A total of 57643 data points were uploaded between May 12 2023 and May 19 2023, which is 95.3% of the data points uploaded, or one data point per 10.5 seconds. | Pass
+| The values that is read by the ESP32 should match up with the data uploaded onto Adafruit IO | 1. Run the script used for reading the TSL2591 and print out the values that it read <br> 2. Confirm that the same data is displayed on Adafruit IO | All values in the ESP32 and Adafruit IO will match up with good Internet connectivity | All values did match up. | Pass
+| The sensor should be able to reliably detect when someone is "sleeping" (i.e. when there is less than 30 units of visible light) | 1. The sensor would be left in a dark place for 24 hours <br> 2. Check Adafruit to see if the visible feed is filled with readings of 0 (no light detected) | The overwhelming majority of the data points should be 0. There could be some 1s due to random voltage spikes/noise read by the sensor. | On the 12th of May, all 8235 data points uploaded carried a value of 0. | Pass
+| The ESP32 should be able to send sensor data right after a burn-reset. | 1. Finish setting up the system by following the instructions above. <br> 2. Burn the script through Arduino IDE. <br> 3. Reset the ESP32. | The sensor data should be sent to Adafruit IO after the reset. | Sensor data appeared on Adafruit IO roughly 5 seconds after resetting the ESP32. | Pass
+
+### Website Tests
+Tests performed on the website are used to ensure that the user experience is bug-free. This will be all acceptance testing.
+
+| Cases | Steps | Expected | Actual | Result
+| --- | --- | --- | --- | --- |
+| As with the ESP32, there is a need to check to see if the data shown on the website is accurate to what was actually read. | 1. Graph a particular day on Adafruit IO <br> 2. Check if graph contours look right <br> 3. See if live readings match up with the latest readings on Adafruit IO | Graph contours and live readings should generally be the same. | Graph contours and live readings were the same. (see Appendix 1) | Pass |
+| The user should be able to see a graph whenever they choose a date and press the visualise button. | 1. Choose a valid date <br> 2. Make the graph using a different combinations of daily/weekly statistics and types of charts. | The graph should be rendered with any combination. | The graph was able to be rendered with any combination with the data from 11 May 2023. | Pass
+| The daily statistics should line up with the weekly statistics' breakdown of days. | 1. Graph a week's worth of data, day-by-day. Note down how many hours we've slept <br> 2. Graph a weekly chart starting from the first day as above. Compare the numbers | Both values should be the same to one another | The values we all the same as that of each other's. | Pass
+| The website should be able to handle a user trying to render a chart with an invalid date (i.e. a day that doesn't have any Adafruit IO data in it) | 1. Choose an invalid date <br> 2. Press Validate | The website should still be able to function normally after that. | We tried to visualise data from 1 Jan 2023, which had no historical data associated with that day. The website still functioned normally after that, and could still visualise data. | Pass
+
+
+## Future Work
+An obvious addition to this project is to add a more reliable IR sensor that could detect when someone is in front of it. This would make the system better as it wouldn't rely on solely just the light in order to determine if someone is sleeping.
+
+This project can also be expanded on by adding more sensors so that they can be visualised. The architecture is already there, as demonstrated by the TSL2591, so it wouldn't be too hard to build on the project by adding more sensors.
+## Appendix 1
+Adafruit chart:
+![the aforementioned architecture diagram](adafruitchart.png)
+Our chart:
+![the aforementioned architecture diagram](websitechart.png)
+
+
+
+
+
+
+
