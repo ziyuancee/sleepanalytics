@@ -1,6 +1,3 @@
-
-# COM3505 Lab Assessment 2
-
 ## Video Demonstration
 short video demonstrating the functionalities of the website:
 https://youtu.be/aNLOAt2RVKk (please turn on the youtube subtitle to have a clearer understanding)
